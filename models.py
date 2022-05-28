@@ -1,79 +1,107 @@
-from flask_sqlalchemy import SQLAlchemy
 
-db = SQLAlchemy()
+from datetime import datetime
+from app import db
 
-# ----------------------------------------------------------------------------#
-# Models.
-# ----------------------------------------------------------------------------#
-class Venue_Genre(db.Model):
-    __tablename__ = "venue_genres"
+
+class Genre(db.Model):
+    __tablename__ = 'Genre'
+
     id = db.Column(db.Integer, primary_key=True)
-    venue_id = db.Column(
-        db.Integer, db.ForeignKey("venues.id", ondelete="CASCADE"), nullable=False
-    )
-    genre = db.Column(db.String(50), nullable=False)
+    name = db.Column(db.String)
 
-    def __repr__(self):
-        return f"<Venue_Genre venue_id:{self.venue_id} genre: {self.genre}>"
+# Initial population of the Genre table here --> No, for grading they want it to be blank
+# (just the schema is defined) and we count on the web form validators to only show valid choices (forms.py)
+
+# Association tables for Artist to Genre (many2many) and Venue to Genre (many2many)
+# DEFINE the Genre table as the child since it normally doesn't matter which we pick, but in this case,
+# its common to both many2many relationships and we have to constrain the parents to just one backref!
+artist_genre_table = db.Table('artist_genre_table',
+    db.Column('genre_id', db.Integer, db.ForeignKey('Genre.id'), primary_key=True),
+    db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True)
+)
+
+venue_genre_table = db.Table('venue_genre_table',
+    db.Column('genre_id', db.Integer, db.ForeignKey('Genre.id'), primary_key=True),
+    db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
+)
 
 
 class Venue(db.Model):
-    __tablename__ = "venues"
+    __tablename__ = 'Venue'
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    address = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120), nullable=True)
-    genres = db.relationship(
-        "Venue_Genre", passive_deletes=True, backref="venue", lazy=True,
-    )
-    seeking_talent = db.Column(db.Boolean, nullable=True, default=False)
-    seeking_description = db.Column(db.String(120), nullable=True)
-    image_link = db.Column(
-        db.String(500),
-        nullable=True,
-        default="https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
-    )
-    facebook_link = db.Column(db.String(120), nullable=True, default="")
-    website = db.Column(db.String(120), nullable=True)
+    name = db.Column(db.String)
+    city = db.Column(db.String(120))
+    state = db.Column(db.String(120))
+    address = db.Column(db.String(120))
+    phone = db.Column(db.String(120))
+    image_link = db.Column(db.String(500))
+    facebook_link = db.Column(db.String(120))
 
+    # Here we link the associative table for the m2m relationship with genre
+    genres = db.relationship('Genre', secondary=venue_genre_table, backref=db.backref('venues'))
+    # secondary links this to the associative (m2m) table name
+    # can refences like venue.genres with the above statement
+    # backref creates an attribute on Venue objects so we can also reference like: genre.venues
 
-class Show(db.Model):
-    __tablename__ = "shows"
-    artist_id = db.Column(db.Integer, db.ForeignKey("artists.id"), primary_key=True)
-    venue_id = db.Column(
-        db.Integer, db.ForeignKey("venues.id", ondelete="CASCADE"), primary_key=True
-    )
-    start_time = db.Column(db.DateTime, nullable=False)
+    website = db.Column(db.String(120))
+    seeking_talent = db.Column(db.Boolean, default=False)
+    seeking_description = db.Column(db.String(120))
 
-
-class Artist_Genre(db.Model):
-    __tablename__ = "artist_genres"
-    id = db.Column(db.Integer, primary_key=True)
-    artist_id = db.Column(db.Integer, db.ForeignKey("artists.id"), nullable=False)
-    genre = db.Column(db.String(50), nullable=False)
+    # Venue is the parent (one-to-many) of a Show (Artist is also a foreign key, in def. of Show)
+    # In the parent is where we put the db.relationship in SQLAlchemy
+    shows = db.relationship('Show', backref='venue', lazy=True)    # Can reference show.venue (as well as venue.shows)
 
     def __repr__(self):
-        return f"<Artist_Genre artist_id:{self.artist_id} genre: {self.genre}>"
+        return f'<Venue {self.id} {self.name}>'
 
 
 class Artist(db.Model):
-    __tablename__ = "artists"
+    __tablename__ = 'Artist'
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120), nullable=False)
-    genres = db.relationship("Artist_Genre", backref="artist", lazy=True)
-    image_link = db.Column(
-        db.String(500),
-        nullable=True,
-        default="https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-    )
-    facebook_link = db.Column(db.String(120), nullable=True)
-    venues = db.relationship(
-        "Venue", secondary="shows", backref=db.backref("artists", lazy=True)
-    )
-    seeking_venue = db.Column(db.Boolean, nullable=True, default=False)
-    seeking_description = db.Column(db.String(), nullable=True, default="")
+    name = db.Column(db.String)
+    city = db.Column(db.String(120))
+    state = db.Column(db.String(120))
+    phone = db.Column(db.String(120))
+    # Genre should be its own table, with a many2many relationship with Artist
+    # and another many2many relationship with Venue
+    # genres = db.Column(db.String(120))
+    image_link = db.Column(db.String(500))
+    facebook_link = db.Column(db.String(120))
+
+    # Here we link the associative table for the m2m relationship with genre
+    genres = db.relationship('Genre', secondary=artist_genre_table, backref=db.backref('artists'))
+    # secondary links this to the associative (m2m) table name
+    # can refences like artist.genres with the above statement
+    # backref creates an attribute on Artist objects so we can also reference like: genre.artists
+
+    website = db.Column(db.String(120))
+    seeking_venue = db.Column(db.Boolean, default=False)
+    seeking_description = db.Column(db.String(120))
+
+    # Artist is the parent (one-to-many) of a Show (Venue is also a foreign key, in def. of Show)
+    # In the parent is where we put the db.relationship in SQLAlchemy
+    shows = db.relationship('Show', backref='artist', lazy=True)    # Can reference show.artist (as well as artist.shows)
+
+    def __repr__(self):
+        return f'<Artist {self.id} {self.name}>'
+
+
+class Show(db.Model): 
+    __tablename__ = 'Show'
+
+    id = db.Column(db.Integer, primary_key=True)
+    start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)    # Start time required field
+
+    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)   # Foreign key is the tablename.pk
+    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
+
+    # def __repr__(self):
+    #     return f'<Show {self.id} {self.start_time} artist_id={artist_id} venue_id={venue_id}>'
+
+
+#----------------------------------------------------------------------------#
+# Filters.
+#----------------------------------------------------------------------------#
+# db.create_all()
